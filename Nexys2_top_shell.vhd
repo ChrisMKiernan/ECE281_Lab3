@@ -92,12 +92,32 @@ signal ClockBus_sig : STD_LOGIC_VECTOR (26 downto 0);
 --Insert your design's component declaration below	
 --------------------------------------------------------------------------------------
 
+	COMPONENT MooreElevatorController_Shell
+	PORT(
+		clk : in  STD_LOGIC;
+		reset : in  STD_LOGIC;
+		stop : in  STD_LOGIC;
+		up_down : in  STD_LOGIC;
+		floor : out  STD_LOGIC_VECTOR (3 downto 0)
+		);
+	END COMPONENT;
 
-
+	COMPONENT MealyElevatorController_Shell
+	PORT(
+		clk : in  STD_LOGIC;
+		reset : in  STD_LOGIC;
+		stop : in  STD_LOGIC;
+		up_down : in  STD_LOGIC;
+		floor : out  STD_LOGIC_VECTOR (3 downto 0);
+		nextfloor : out std_logic_vector (3 downto 0));
+	END COMPONENT;
+		
 --------------------------------------------------------------------------------------
 --Insert any required signal declarations below
 --------------------------------------------------------------------------------------
 
+signal floor_moore, floor_mealy_n, floor_mealy, floor_use, floor_use_n : std_logic_vector (3 downto 0);
+signal clockbus_use : std_logic;
 
 
 begin
@@ -125,10 +145,42 @@ LED <= CLOCKBUS_SIG(26 DOWNTO 19);
 --		  Example: if you are not using 7-seg display #3 set nibble3 to "0000"
 --------------------------------------------------------------------------------------
 
-nibble0 <= 
-nibble1 <= 
-nibble2 <= 
-nibble3 <= 
+--Here I am just assigning the switches some use: with whatever is the most significant switch in the on or high position determines the clock speed to use
+clockbus_use <= clockbus_sig(26) when (switch(7)='1') else
+					clockbus_sig(25) when (switch(6)='1') else
+					clockbus_sig(24) when (switch(5)='1') else
+					clockbus_sig(23) when (switch(4)='1') else
+					clockbus_sig(26);
+
+MooreComponent: MooreElevatorController_Shell PORT MAP(
+	clk => clockbus_use,
+	reset => btn(0),
+	stop => btn(3),
+	up_down => switch(0),
+	floor => floor_moore
+	);
+
+MealyComponent: MealyElevatorController_Shell PORT MAP(
+	clk => clockbus_use,
+	reset => btn(0),
+	stop => btn(3),
+	up_down => switch(0),
+	floor => floor_mealy,
+	nextfloor => floor_mealy_n
+	);
+
+--Decide whether to use Mealy or moore machine
+floor_use <= floor_moore when (switch(1) = '0') else
+				floor_mealy when (switch(1) = '1') else
+				floor_moore;
+floor_use_n <= floor_mealy_n when (switch(1) = '1') else
+					"0000";
+					
+--since our floor numbers only go through four, we dont need any other nibble values than the least significant value
+nibble0 <= floor_use;
+nibble1 <= "0000";
+nibble2 <= floor_use_n;
+nibble3 <= "0000";
 
 --This code converts a nibble to a value that can be displayed on 7-segment display #0
 	sseg0: nibble_to_sseg PORT MAP(
